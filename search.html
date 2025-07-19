@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Quote Vector Search</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                max-width: 600px;
+                margin: auto;
+            }
+            input {
+                width: 100%;
+                padding: 10px;
+                font-size: 16px;
+            }
+            .result {
+                margin: 10px 0;
+                padding: 10px;
+                border-bottom: 1px solid #ccc;
+            }
+            .author {
+                font-weight: bold;
+            }
+            .quote {
+                margin-top: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Search Quotes</h2>
+        <input
+            type="text"
+            id="queryInput"
+            placeholder="Type your search here"
+        />
+
+        <div id="results"></div>
+
+        <script>
+            let model;
+            let quotes = [];
+            let quoteVectors = [];
+
+            // Load quotes JSON file
+            async function loadQuotes() {
+                const res = await fetch("quotes.json");
+                quotes = await res.json();
+            }
+
+            // Compute cosine similarity between two vectors
+            function cosineSimilarity(vecA, vecB) {
+                const dot = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
+                const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
+                const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
+                return dot / (magA * magB);
+            }
+
+            async function embedQuotes() {
+                const texts = quotes.map((q) => q.quote);
+                const embeddings = await model.embed(texts);
+                quoteVectors = embeddings.arraySync();
+            }
+
+            async function search(query) {
+                const queryEmbeddingTensor = await model.embed([query]);
+                const queryVector = queryEmbeddingTensor.arraySync()[0];
+
+                // Calculate similarity scores
+                const scores = quoteVectors.map((vec, i) => ({
+                    index: i,
+                    score: cosineSimilarity(queryVector, vec),
+                }));
+
+                // Sort descending by similarity score
+                scores.sort((a, b) => b.score - a.score);
+
+                return scores.slice(0, 5); // top 5 results
+            }
+
+            function displayResults(results) {
+                const resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML = "";
+
+                results.forEach(({ index, score }) => {
+                    const q = quotes[index];
+                    const div = document.createElement("div");
+                    div.className = "result";
+                    div.innerHTML = `<div class="author">${
+                        q.author
+                    }</div><div class="quote">${
+                        q.quote
+                    }</div><div>Score: ${score.toFixed(3)}</div>`;
+                    resultsDiv.appendChild(div);
+                });
+            }
+
+            async function init() {
+                model = await use.load();
+                await loadQuotes();
+                await embedQuotes();
+
+                const input = document.getElementById("queryInput");
+                input.addEventListener("input", async () => {
+                    const query = input.value.trim();
+                    if (query.length > 0) {
+                        const results = await search(query);
+                        displayResults(results);
+                    } else {
+                        document.getElementById("results").innerHTML = "";
+                    }
+                });
+            }
+
+            // Start app
+            init();
+        </script>
+    </body>
+</html>

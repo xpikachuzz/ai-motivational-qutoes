@@ -1,5 +1,7 @@
 import csv
 import json
+import os 
+
 
 def csv_to_quote_txt(csv_file_path, output_file_path):
     with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
@@ -49,6 +51,25 @@ def quotesJson():
                 quote, author = obj['Quote'], obj['Author']
                 txtfile.write(f"{author}:{quote}\n")
 
+def quotesJson():
+    with open("./raw/quotes.json", 'r', encoding='utf-8') as json_data:
+        with open("./processed/quotes_json.txt", 'w', encoding='utf-8') as txtfile:
+            d = json.load(json_data)
+            for obj in d:
+                quote, author = obj['Quote'], obj['Author']
+                txtfile.write(f"{author}:{quote}\n")
+
+# Collect all quotes
+quotes = []
+file_dir = './processed/'
 
 
-quotesJson()
+with open("quotes.txt", "w") as outfile:
+    for filename in os.listdir(file_dir):
+        if filename.endswith('.txt'):
+            with open(os.path.join(file_dir, filename), 'r', encoding='utf-8') as file:
+                for line in file:
+                    line = line.strip()
+                    if ':' in line:
+                        author, quote = line.split(':', 1)
+                        outfile.write(f"{author}:{quote}\n")
