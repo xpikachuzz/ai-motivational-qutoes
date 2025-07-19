@@ -1,30 +1,21 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import numpy as np
 from sentence_transformers import SentenceTransformer
+import faiss
 import uvicorn
 
 app = FastAPI()
 
-# Load quotes.txt
-quotes = []
-authors = []
-
-with open("quotes.txt", encoding="utf-8") as f:
-    for line in f:
-        if ':' in line:
-            author, quote = line.strip().split(':', 1)
-            authors.append(author.strip())
-            quotes.append(quote.strip())
-
-# Load embedding model
+# Load embedding model and FAISS index once
 model = SentenceTransformer('all-MiniLM-L6-v2')
+index = faiss.read_index('quotes_faiss.index')
 
-# Embed all quotes once
-quote_embeddings = model.encode(quotes)
+# Load quotes lookup once
+with open('quotes_lookup.txt', 'r', encoding='utf-8') as f:
+    quotes = [line.strip() for line in f.readlines()]
 
-# API request schema
-class Query(BaseModel):
+# Request body schema
+class SearchQuery(BaseModel):
     text: str
     k: int = 5
 
@@ -33,23 +24,15 @@ def home():
     return {"message": "Quote Vector Search API is running."}
 
 @app.post("/search/")
-def search(query: Query):
-    query_embedding = model.encode([query.text])[0]
+def search(query: SearchQuery):
+    # Embed query dynamically
+    query_vector = model.encode([query.text], convert_to_numpy=True).astype('float32')
 
-    # Compute cosine similarity
-    similarities = np.dot(quote_embeddings, query_embedding) / (
-        np.linalg.norm(quote_embeddings, axis=1) * np.linalg.norm(query_embedding)
-    )
+    # Search in FAISS index
+    D, I = index.search(query_vector, query.k)
 
-    top_indices = np.argsort(similarities)[::-1][:query.k]
-
-    results = []
-    for idx in top_indices:
-        results.append({
-            "author": authors[idx],
-            "quote": quotes[idx],
-            "score": float(similarities[idx])
-        })
+    # Prepare results
+    results = [quotes[idx] for idx in I[0]]
 
     return {"results": results}
 
