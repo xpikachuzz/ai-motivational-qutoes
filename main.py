@@ -3,8 +3,15 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 import faiss
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with your frontend URL for better security
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load embedding model and FAISS index once
 model = SentenceTransformer('all-MiniLM-L6-v2')
