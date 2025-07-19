@@ -59,17 +59,37 @@ def quotesJson():
                 quote, author = obj['Quote'], obj['Author']
                 txtfile.write(f"{author}:{quote}\n")
 
-# Collect all quotes
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+# Load quotes.txt
+authors = []
 quotes = []
-file_dir = './processed/'
 
+with open('quotes.txt', 'r', encoding='utf-8') as f:
+    for line in f:
+        if ':' in line:
+            author, quote = line.strip().split(':', 1)
+            authors.append(author.strip())
+            quotes.append(quote.strip())
 
-with open("quotes.txt", "w") as outfile:
-    for filename in os.listdir(file_dir):
-        if filename.endswith('.txt'):
-            with open(os.path.join(file_dir, filename), 'r', encoding='utf-8') as file:
-                for line in file:
-                    line = line.strip()
-                    if ':' in line:
-                        author, quote = line.split(':', 1)
-                        outfile.write(f"{author}:{quote}\n")
+# Save lookup file (optional but useful)
+with open('quotes_lookup.txt', 'w', encoding='utf-8') as f:
+    for author, quote in zip(authors, quotes):
+        f.write(f"{author}:{quote}\n")
+
+# Load embedding model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Generate embeddings
+embeddings = model.encode(quotes).astype('float32')
+
+# Build FAISS index
+index = faiss.IndexFlatL2(embeddings.shape[1])
+index.add(embeddings)
+
+# Save FAISS index
+faiss.write_index(index, 'quotes_faiss.index')
+
+print(f"Index built and saved with {index.ntotal} quotes.")
